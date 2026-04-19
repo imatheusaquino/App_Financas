@@ -19,7 +19,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { Transaction, TransactionFormData, EXPENSE_CATEGORIES, INCOME_CATEGORIES } from '@/types'
 
@@ -46,7 +46,6 @@ export function TransactionForm({ open, onClose, transaction }: TransactionFormP
 
   function handleChange(field: keyof typeof form, value: string) {
     setForm(prev => ({ ...prev, [field]: value }))
-    if (field === 'category') return
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -65,7 +64,16 @@ export function TransactionForm({ open, onClose, transaction }: TransactionFormP
     setLoading(true)
     const supabase = createClient()
 
+    // Busca o usuário autenticado para incluir o user_id no payload
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      toast.error('Sessão expirada. Faça login novamente.')
+      setLoading(false)
+      return
+    }
+
     const payload = {
+      user_id: user.id,
       type,
       amount,
       description: form.description,
@@ -80,7 +88,7 @@ export function TransactionForm({ open, onClose, transaction }: TransactionFormP
         .eq('id', transaction.id)
 
       if (error) {
-        toast.error('Erro ao atualizar transação.')
+        toast.error(`Erro ao atualizar: ${error.message}`)
         setLoading(false)
         return
       }
@@ -88,7 +96,7 @@ export function TransactionForm({ open, onClose, transaction }: TransactionFormP
     } else {
       const { error } = await supabase.from('transactions').insert(payload)
       if (error) {
-        toast.error('Erro ao registrar transação.')
+        toast.error(`Erro ao registrar: ${error.message}`)
         setLoading(false)
         return
       }
