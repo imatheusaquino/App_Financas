@@ -4,7 +4,7 @@ import { SummaryCards } from '@/components/dashboard/summary-cards'
 import { ExpenseChart } from '@/components/dashboard/expense-chart'
 import { RecentTransactions } from '@/components/dashboard/recent-transactions'
 import { MonthSelector } from '@/components/dashboard/month-selector'
-import { format } from 'date-fns'
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 import { Transaction } from '@/types'
 
 interface DashboardPageProps {
@@ -14,32 +14,39 @@ interface DashboardPageProps {
 export default async function DashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams
   const currentMonth = params.month ?? format(new Date(), 'yyyy-MM')
-  const [year, month] = currentMonth.split('-')
-  const startDate = `${year}-${month}-01`
-  const endDate = `${year}-${month}-31`
+
+  // Usa date-fns para calcular o primeiro e último dia real do mês
+  const refDate = parseISO(`${currentMonth}-01`)
+  const startDate = format(startOfMonth(refDate), 'yyyy-MM-dd')
+  const endDate = format(endOfMonth(refDate), 'yyyy-MM-dd')
 
   const supabase = await createClient()
-  const { data: transactions } = await supabase
+
+  const { data: transactions, error } = await supabase
     .from('transactions')
     .select('*')
     .gte('date', startDate)
     .lte('date', endDate)
     .order('date', { ascending: false })
 
+  if (error) {
+    console.error('Dashboard query error:', error.message)
+  }
+
   const txs: Transaction[] = transactions ?? []
 
   const totalIncome = txs
     .filter(t => t.type === 'income')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
 
   const totalExpense = txs
     .filter(t => t.type === 'expense')
-    .reduce((sum, t) => sum + t.amount, 0)
+    .reduce((sum, t) => sum + Number(t.amount), 0)
 
   const expenseByCategory = txs
     .filter(t => t.type === 'expense')
     .reduce((acc: Record<string, number>, t) => {
-      acc[t.category] = (acc[t.category] ?? 0) + t.amount
+      acc[t.category] = (acc[t.category] ?? 0) + Number(t.amount)
       return acc
     }, {})
 
@@ -50,7 +57,7 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
       <Header title="Dashboard" />
       <div className="flex-1 px-6 py-6 space-y-6">
         <div className="flex items-center justify-between flex-wrap gap-3">
-          <p className="text-sm text-slate-500">Resumo do período selecionado</p>
+          <p className="text-sm text-muted-foreground">Resumo do período selecionado</p>
           <MonthSelector currentMonth={currentMonth} />
         </div>
         <SummaryCards totalIncome={totalIncome} totalExpense={totalExpense} />

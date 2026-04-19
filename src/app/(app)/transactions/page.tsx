@@ -6,6 +6,7 @@ import { NewTransactionButton } from '@/components/transactions/new-transaction-
 import { Card, CardContent } from '@/components/ui/card'
 import { Suspense } from 'react'
 import { Transaction } from '@/types'
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns'
 
 interface TransactionsPageProps {
   searchParams: Promise<{
@@ -25,8 +26,10 @@ export default async function TransactionsPage({ searchParams }: TransactionsPag
     .order('date', { ascending: false })
 
   if (params.month) {
-    const [year, month] = params.month.split('-')
-    query = query.gte('date', `${year}-${month}-01`).lte('date', `${year}-${month}-31`)
+    const refDate = parseISO(`${params.month}-01`)
+    const startDate = format(startOfMonth(refDate), 'yyyy-MM-dd')
+    const endDate = format(endOfMonth(refDate), 'yyyy-MM-dd')
+    query = query.gte('date', startDate).lte('date', endDate)
   }
 
   if (params.type && params.type !== 'all') {
